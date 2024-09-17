@@ -29,15 +29,17 @@ BEGIN
                    END                AS status, -- "reserved" or "free" status for each timeslot
                 -- for commentaries
                CASE
-                   -- Check if the timeslot falls within a reservation period for that local
+                   -- Fetch commentary based on the reservation, cubicule, or parent local
                    WHEN (r.reservation_id IS NOT NULL AND ts.timeslot >= r.reserved_for AND
-                         ts.timeslot < r.reservation_end) OR
-                        (NOT is_cubicules_free(l.pavillon_id, l.local_id, ts.timeslot, ts.timeslot)) OR
-                        (NOT parent_free(l.pavillon_id, l.local_id, ts.timeslot, ts.timeslot))THEN
-                       get_reservation_commentary(r.reservation_id)
+                         ts.timeslot < r.reservation_end) THEN
+                       get_reservation_commentary(r.reservation_id, l.pavillon_id, l.local_id, ts.timeslot, ts.timeslot)
+                   WHEN NOT is_cubicules_free(l.pavillon_id, l.local_id, ts.timeslot, ts.timeslot) THEN
+                       get_cubicule_commentary(l.pavillon_id, l.local_id, ts.timeslot, ts.timeslot)
+                   WHEN NOT parent_free(l.pavillon_id, l.local_id, ts.timeslot, ts.timeslot) THEN
+                       get_parent_commentary(l.pavillon_id, l.local_id, ts.timeslot, ts.timeslot)
                    ELSE
-                        r.commentary
-                   END                AS commentary -- "reserved" or "free" status for each timeslot
+                       NULL
+                   END AS commentary
 
         FROM public.local_type l
                  CROSS JOIN
@@ -60,15 +62,6 @@ $$
     BEGIN
         RAISE INFO 'res id: %', wanted_reservation_id;
         SELECT commentary INTO result FROM reservation WHERE reservation_id=wanted_reservation_id;
-
-        IF is_cubicules_free(big_pavillon_id, big_local_id, wanted_reserved_for, wanted_reservation_end) THEN
-            result := get_cubicule_commentary(big_pavillon_id, big_local_id, wanted_reserved_for, wanted_reservation_end);
-        END IF;
-
-        IF parent_free(big_pavillon_id, big_local_id, wanted_reserved_for, wanted_reservation_end) THEN
-            result := get_parent_commentary(big_pavillon_id, big_local_id, wanted_reserved_for, wanted_reservation_end);
-        END IF;
-
         RETURN result;
     END;
 $$ LANGUAGE plpgsql;
