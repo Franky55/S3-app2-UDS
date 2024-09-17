@@ -77,7 +77,10 @@ insert into public.locals_ressources values('C2', '2014', 1, 2);
 insert into public.locals_ressources values('C3', '1001', 2, 3);
 insert into public.locals_ressources values('C3', '1400', 4, 30);
 
-
+-- Les locaux avec des locaux dedans
+insert into public.local_with_locals values('C1', '3125', 'C1', '3125-1');
+insert into public.local_with_locals values('C1', '3125', 'C1', '3125-2');
+insert into public.local_with_locals values('C1', '3125', 'C1', '3125-3');
 
 
 

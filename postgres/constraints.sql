@@ -28,25 +28,87 @@ $$
 $$ LANGUAGE plpgsql;
 
 -------------------------------------------------------
+-- Verifie si tu peut loue le local based of si ces sous-locaux ont des reservations
+-------------------------------------------------------
+CREATE OR REPLACE FUNCTION local_cubicules_available(big_pavillon_id TEXT, big_local_id TEXT, wanted_reserved_for TIMESTAMP, wanted_reservation_end TIMESTAMP) RETURNS BOOLEAN AS
+$$
+DECLARE
+    all_available BOOLEAN := true;
+    cubicules RECORD; -- To store each row of the result
+    reservation_record RECORD;
+    cubicules_cursor CURSOR FOR
+        SELECT pavillon_id_1, local_id_1
+        FROM local_with_locals
+        WHERE local_id = big_local_id AND pavillon_id = big_pavillon_id;
+BEGIN
+    -- Open the cursor
+    OPEN cubicules_cursor;
+
+    -- Loop through each record
+    LOOP
+        FETCH cubicules_cursor INTO cubicules;
+        EXIT WHEN NOT FOUND;
+
+        -- Access individual values using cubicules.pavillon_id_1 and cubicules.local_id_1
+        -- Perform your logic here; for example:
+        RAISE NOTICE '--- CUBICULE FOUND: Pavillon ID: %, Local ID: %', cubicules.pavillon_id_1, cubicules.local_id_1;
+
+        FOR reservation_record IN
+            SELECT reservation_id
+            FROM public.reservation
+            WHERE pavillon_id=cubicules.pavillon_id_1 AND local_id=cubicules.local_id_1
+        LOOP
+            IF(reservation_in_conflict(reservation_record.reservation_id,wanted_reserved_for,wanted_reservation_end)) THEN
+                RAISE INFO '- The cubicule is reserved during your wanted scheduling!!!';
+                all_available := false;
+                CLOSE cubicules_cursor;
+                RETURN all_available;
+            END IF;
+        END LOOP;
+    END LOOP;
+
+    -- Close the cursor
+    CLOSE cubicules_cursor;
+
+    RETURN all_available;
+END;
+$$ LANGUAGE plpgsql;
+-------------------------------------------------------
+-- Verifie si le local est un sous-local d'un plus gros local qui serait peut-etre reserve
+-------------------------------------------------------
+
+-------------------------------------------------------
 -- Insert une nouvelle reservation si les dates matches
 -------------------------------------------------------
 CREATE OR REPLACE FUNCTION new_reservation() RETURNS TRIGGER AS
 $$
     DECLARE
-        can_reserve BOOLEAN;
+        can_reserve BOOLEAN := true;
         new_id INT;
         reservation_record RECORD;
     BEGIN
-        -- Get les reservations pour ce local la
-        --SELECT reservation_id INTO reservations FROM public.reservation WHERE pavillon_id=$1,local_id=$2;
-        can_reserve := true;
+        RAISE INFO '----------------------------------------------------------- NEW RESERVATION';
 
+        RAISE INFO 'Checking if the local has cubicules in it...';
+        -- Check if the lcoal has sub-locals in it. If yes, then they'll all be checked for their own reservations
+        IF local_cubicules_available(NEW.pavillon_id, NEW.local_id, NEW.reserved_for, NEW.reservation_end) THEN
+            RAISE INFO '- If the local has cubicules, they are all available!';
+        ELSE
+            RAISE INFO '- One or more cubicules of your local is reserved for the specified duration!';
+            can_reserve := false;
+            RAISE EXCEPTION 'Schedule conflict found in your locals sub-locals / cubicules. See debug info.';
+        END IF;
+
+        RAISE INFO 'Checking if youre reserving a cubicule';
+
+        -- For each reservation of the wanted local, check if their dates conflicts with the wanted one
         FOR reservation_record IN
             SELECT reservation_id
             FROM public.reservation
             WHERE pavillon_id=NEW.pavillon_id AND local_id=NEW.local_id
         LOOP
             IF(reservation_in_conflict(reservation_record.reservation_id,NEW.reserved_for,NEW.reservation_end)) THEN
+                RAISE INFO '- Another reservation is in conflict with the wanted one!';
                 can_reserve := false;
             END IF;
         END LOOP;
@@ -56,7 +118,7 @@ $$
             NEW.reservation_id := new_id;
             return NEW;
         ElSE
-            RAISE EXCEPTION 'Conflit!';
+            RAISE EXCEPTION 'Schedule conflict found! Reservation cancelled';
         END IF;
     END;
 $$ LANGUAGE plpgsql;
