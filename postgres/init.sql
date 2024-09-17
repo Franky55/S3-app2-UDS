@@ -1,3 +1,6 @@
+create schema public;
+set search_path = public;
+
 CREATE TABLE person(
    person_id INTEGER,
    name TEXT,
@@ -116,3 +119,34 @@ CREATE TABLE local_with_locals(
    FOREIGN KEY(pavillon_id, local_id) REFERENCES local_type(pavillon_id, local_id),
    FOREIGN KEY(pavillon_id_1, local_id_1) REFERENCES local_type(pavillon_id, local_id)
 );
+
+
+
+CREATE OR REPLACE FUNCTION  TABLEAU(p_debut INT, p_fin INT)
+RETURNS TABLE (
+    local VARCHAR,
+    reserved_for BIGINT,
+    reservation_end BIGINT
+    )
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    -- Sélectionne les informations des réservations avec les conditions
+    SELECT
+        --l.description AS local,
+        l.local_id::VARCHAR AS local,
+        r.reserved_for,
+        r.reservation_end
+    FROM
+        public.local_type l
+    LEFT JOIN
+        public.reservation r ON l.local_id = r.local_id
+        AND r.reserved_for >= p_debut
+        AND r.reservation_end <= p_fin
+    --WHERE
+        --l.categorie = p_categorie
+    ORDER BY
+        r.reserved_for;
+END;
+$$;
