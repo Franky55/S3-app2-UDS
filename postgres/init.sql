@@ -137,40 +137,45 @@ CREATE TABLE local_with_locals
 
 
 CREATE OR REPLACE FUNCTION TABLEAU(p_debut TIMESTAMP, p_fin TIMESTAMP, p_categorie INT)
-    RETURNS TABLE
-            (
-                local              VARCHAR,
-                timeslot           TIMESTAMP,
-                reservation_status VARCHAR
-            )
+    RETURNS TABLE (
+                      local_id VARCHAR,
+                      timeslot TIMESTAMP,
+                      status VARCHAR
+                  )
     LANGUAGE plpgsql
 AS
 $$
 BEGIN
     RETURN QUERY
--- Génère des plages horaires de 15 minutes et les associe aux locaux
+        -- Generate 15-minute time slots between p_debut and p_fin
         WITH time_slots AS (
--- Génère toutes les plages horaires de 15 minutes entre p_debut et p_fin
-            SELECT generate_series(p_debut, p_fin, interval '15 minutes') AS timeslot)
-        SELECT l.local_id::VARCHAR AS local,
-               ts.timeslot,
-               CASE
--- Si une réservation existe dans cette plage, retourne l'ID de la réservation
-                   WHEN r.reserved_for IS NOT NULL AND ts.timeslot >= r.reserved_for AND ts.timeslot < r.reservation_end
-                       THEN
-                       'Réservation ID: ' || r.reservation_id
-                   ELSE 'Disponible' -- Sinon, indique que la plage est disponible
-                   END             AS reservation_status
-        FROM public.local_type l
-                 CROSS JOIN
-             time_slots ts -- Associe chaque local à chaque plage horaire
-                 LEFT JOIN
-             public.reservation r ON l.local_id = r.local_id
-                 AND ts.timeslot >= r.reserved_for
-                 AND ts.timeslot < r.reservation_end
-        WHERE l.local_category_id = p_categorie
-        ORDER BY l.local_id, ts.timeslot;
+            SELECT generate_series(p_debut, p_fin, interval '15 minutes') AS timeslot
+        )
+        SELECT
+            l.local_id::VARCHAR AS local_id,
+            ts.timeslot,  -- 15m interval
+            CASE
+                -- Check if the timeslot falls within a reservation period for that local
+                WHEN r.reservation_id IS NOT NULL AND ts.timeslot >= r.reserved_for AND ts.timeslot < r.reservation_end THEN
+                    'reserved'::VARCHAR
+                ELSE
+                    'free'::VARCHAR
+                END AS status  -- "reserved" or "free" status for each timeslot
+        FROM
+            public.local_type l
+                CROSS JOIN
+            time_slots ts  -- Associate each local with each timeslot
+                LEFT JOIN
+            public.reservation r ON l.local_id = r.local_id
+                AND ts.timeslot >= r.reserved_for
+                AND ts.timeslot < r.reservation_end
+        WHERE
+            l.local_category_id = p_categorie
+        ORDER BY
+            l.local_id, ts.timeslot;  -- Order by local and timeslot
 END;
 $$;
+
+
 
 --insert into public.reservation values(0, 'C1', '3125', 0, 1, 2);
