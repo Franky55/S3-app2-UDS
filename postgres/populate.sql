@@ -60,6 +60,7 @@ insert into public.peoples_statuses values(4, 3); -- Lui, il a plusieurs status
 
 -- Quelques locaux. Cree les locaux
 insert into public.local_type values('C1', '3125', 'Laboratoire proceduraux 1', 1);
+insert into public.local_type values('C1', '3126', 'Laboratoire proceduraux 2', 1);
 insert into public.local_type values('C1', '5119', 'Laboratoire de chimie', 0);
 insert into public.local_type values('C2', '2014', 'Auditorium 2', 2);
 insert into public.local_type values('C3', '1001', 'Local de reunion', 3);
