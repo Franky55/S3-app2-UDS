@@ -90,6 +90,7 @@ CREATE TABLE reservation
     reservation_id  INTEGER   NOT NULL,
     reserved_for    TIMESTAMP NOT NULL,
     reservation_end TIMESTAMP NOT NULL,
+    commentary TEXT,
     PRIMARY KEY (person_id, pavillon_id, local_id),
     UNIQUE (reservation_id),
     FOREIGN KEY (person_id) REFERENCES person (person_id),
@@ -140,7 +141,8 @@ CREATE OR REPLACE FUNCTION TABLEAU(p_debut TIMESTAMP, p_fin TIMESTAMP, p_categor
     RETURNS TABLE (
                       local_id VARCHAR,
                       timeslot TIMESTAMP,
-                      status VARCHAR
+                      status VARCHAR,
+                      commentary TEXT
                   )
     LANGUAGE plpgsql
 AS
@@ -160,7 +162,8 @@ BEGIN
                     'reserved'::VARCHAR
                 ELSE
                     'free'::VARCHAR
-                END AS status  -- "reserved" or "free" status for each timeslot
+                END AS status,  -- "reserved" or "free" status for each timeslot
+            r.commentary
         FROM
             public.local_type l
                 CROSS JOIN
