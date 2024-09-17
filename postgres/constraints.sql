@@ -59,10 +59,11 @@ BEGIN
             WHERE pavillon_id=cubicules.pavillon_id_1 AND local_id=cubicules.local_id_1
         LOOP
             IF(reservation_in_conflict(reservation_record.reservation_id,wanted_reserved_for,wanted_reservation_end)) THEN
-                RAISE INFO '- The cubicule is reserved during your wanted scheduling!!!';
-                all_available := false;
-                CLOSE cubicules_cursor;
-                RETURN all_available;
+                --RAISE INFO '- The cubicule is reserved during your wanted scheduling!!!';
+                --all_available := false;
+                --CLOSE cubicules_cursor;
+                --RETURN all_available;
+                RAISE EXCEPTION 'Your reservation failed because some cubicules are reserved during your wanted scheduling. % - %', cubicules.pavillon_id_1, cubicules.local_id_1;
             END IF;
         END LOOP;
     END LOOP;
@@ -105,10 +106,11 @@ BEGIN
             WHERE pavillon_id=parents.pavillon_id AND local_id=parents.local_id
         LOOP
             IF(reservation_in_conflict(reservation_record.reservation_id,wanted_reserved_for,wanted_reservation_end)) THEN
-                RAISE INFO '- The parent is reserved during your wanted scheduling!!!';
-                parent_available := false;
-                CLOSE parents_cursor;
-                RETURN parent_available;
+                --RAISE INFO '- The parent is reserved during your wanted scheduling!!!';
+                --parent_available := false;
+                --CLOSE parents_cursor;
+                --RETURN parent_available;
+                RAISE EXCEPTION 'Your reservation failed because the cubicules parent is reserved during your scheduling. % - %', parents.pavillon_id, parents.local_id;
             END IF;
         END LOOP;
     END LOOP;
@@ -134,21 +136,12 @@ $$
         RAISE INFO 'Checking if the local has cubicules in it...';
         -- Check if the lcoal has sub-locals in it. If yes, then they'll all be checked for their own reservations
         IF local_cubicules_available(NEW.pavillon_id, NEW.local_id, NEW.reserved_for, NEW.reservation_end) THEN
-            RAISE INFO '- If the local has cubicules, they are all available!';
-        ELSE
-            RAISE INFO '- One or more cubicules of your local is reserved for the specified duration!';
-            can_reserve := false;
-            RAISE EXCEPTION 'Schedule conflict found in your locals sub-locals / cubicules. See debug info.';
+            RAISE INFO '- No conflict found / local does not have cubicules';
         END IF;
-
 
         RAISE INFO 'Checking if youre reserving a cubicule';
         IF parent_local_available(NEW.pavillon_id, NEW.local_id, NEW.reserved_for, NEW.reservation_end) THEN
-            RAISE INFO '- If the local is the child of other locals, all their reservations are fine!';
-        ELSE
-            RAISE INFO '- The parents of the local are reserved during your wanted scheduling!';
-            can_reserve := false;
-            RAISE EXCEPTION 'Schedule conflict found. The parent of your cubicule is reserved during your specified time. See debug info.';
+            RAISE INFO '- No conflict found / local is not a cubicule';
         END IF;
 
         -- For each reservation of the wanted local, check if their dates conflicts with the wanted one
