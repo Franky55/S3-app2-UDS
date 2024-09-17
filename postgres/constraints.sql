@@ -1,11 +1,11 @@
 -------------------------------------------------------
 -- Get toutes les reservations pour un local X
 -------------------------------------------------------
-CREATE OR REPLACE FUNCTION reservation_in_conflict(wanted_reservation_id INT, start_date BIGINT, end_date BIGINT) RETURNS BOOLEAN AS
+CREATE OR REPLACE FUNCTION reservation_in_conflict(wanted_reservation_id INT, start_date TIMESTAMP, end_date TIMESTAMP) RETURNS BOOLEAN AS
 $$
     DECLARE
-       reservation_start_time INT;
-       reservation_end_time INT;
+       reservation_start_time TIMESTAMP;
+       reservation_end_time TIMESTAMP;
     BEGIN
         SELECT reserved_for INTO reservation_start_time FROM public.reservation WHERE reservation_id = wanted_reservation_id;
         SELECT reservation_end INTO reservation_end_time FROM public.reservation WHERE reservation_id = wanted_reservation_id;
@@ -16,7 +16,7 @@ $$ LANGUAGE plpgsql;
 -------------------------------------------------------
 -- Check si les dates de reservations sont en conflit
 -------------------------------------------------------
-CREATE OR REPLACE FUNCTION is_dates_in_conflict(reservation_start_time BIGINT, reservation_end_time BIGINT, date_to_check_start BIGINT, date_to_check_end BIGINT) RETURNS BOOLEAN AS
+CREATE OR REPLACE FUNCTION is_dates_in_conflict(reservation_start_time TIMESTAMP, reservation_end_time TIMESTAMP, date_to_check_start TIMESTAMP, date_to_check_end TIMESTAMP) RETURNS BOOLEAN AS
 $$
     BEGIN
         IF ((date_to_check_start < reservation_start_time OR date_to_check_start > reservation_end_time) AND (date_to_check_end < reservation_start_time OR date_to_check_end > reservation_end_time)) THEN

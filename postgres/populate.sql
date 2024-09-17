@@ -82,11 +82,9 @@ insert into public.locals_ressources values('C3', '1400', 4, 30);
 
 
 -- Les permissions
-insert into public.reservation_permissions values(0, 1, 0, 1, 1, true, true,false);
-insert into public.reservation_permissions values(0, 1, 1, 2, 2, false, true,false);
-insert into public.reservation_permissions values(0, 4, 2, 3, 3, true, true,true);
-insert into public.reservation_permissions values(0, 3, 3, 4, 4, true, true,true);
+insert into public.reservation_permissions values(0, 1, 0, '24:00', '24:00', true, true,false);
+insert into public.reservation_permissions values(0, 1, 1, '24:00', '24:00', false, true,false);
+insert into public.reservation_permissions values(0, 4, 2, '24:00', '24:00', true, true,true);
+insert into public.reservation_permissions values(0, 3, 3, '24:00', '24:00', true, true,true);
 
 
---Quelques reservations
-insert into public.reservation values(0, 'C1', '3125', 0, 1, 2);
