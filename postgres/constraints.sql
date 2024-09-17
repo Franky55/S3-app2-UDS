@@ -76,7 +76,49 @@ $$ LANGUAGE plpgsql;
 -------------------------------------------------------
 -- Verifie si le local est un sous-local d'un plus gros local qui serait peut-etre reserve
 -------------------------------------------------------
+CREATE OR REPLACE FUNCTION parent_local_available(small_pavillon_id TEXT, small_local_id TEXT, wanted_reserved_for TIMESTAMP, wanted_reservation_end TIMESTAMP) RETURNS BOOLEAN AS
+$$
+DECLARE
+    parent_available BOOLEAN := true;
+    parents RECORD; -- To store each row of the result
+    reservation_record RECORD;
+    parents_cursor CURSOR FOR
+        SELECT pavillon_id, local_id
+        FROM local_with_locals
+        WHERE local_id_1 = small_local_id AND pavillon_id_1 = small_pavillon_id;
+BEGIN
+    -- Open the cursor
+    OPEN parents_cursor;
 
+    -- Loop through each record
+    LOOP
+        FETCH parents_cursor INTO parents;
+        EXIT WHEN NOT FOUND;
+
+        -- Access individual values using parents_cursor.pavillon_id and parents_cursor.local_id
+        -- Perform your logic here; for example:
+        RAISE NOTICE '--- PARENT LOCAL FOUND: Pavillon ID: %, Local ID: %', parents.pavillon_id, parents.local_id;
+
+        FOR reservation_record IN
+            SELECT reservation_id
+            FROM public.reservation
+            WHERE pavillon_id=parents.pavillon_id AND local_id=parents.local_id
+        LOOP
+            IF(reservation_in_conflict(reservation_record.reservation_id,wanted_reserved_for,wanted_reservation_end)) THEN
+                RAISE INFO '- The parent is reserved during your wanted scheduling!!!';
+                parent_available := false;
+                CLOSE parents_cursor;
+                RETURN parent_available;
+            END IF;
+        END LOOP;
+    END LOOP;
+
+    -- Close the cursor
+    CLOSE parents_cursor;
+
+    RETURN parent_available;
+END;
+$$ LANGUAGE plpgsql;
 -------------------------------------------------------
 -- Insert une nouvelle reservation si les dates matches
 -------------------------------------------------------
@@ -99,7 +141,15 @@ $$
             RAISE EXCEPTION 'Schedule conflict found in your locals sub-locals / cubicules. See debug info.';
         END IF;
 
+
         RAISE INFO 'Checking if youre reserving a cubicule';
+        IF parent_local_available(NEW.pavillon_id, NEW.local_id, NEW.reserved_for, NEW.reservation_end) THEN
+            RAISE INFO '- If the local is the child of other locals, all their reservations are fine!';
+        ELSE
+            RAISE INFO '- The parents of the local are reserved during your wanted scheduling!';
+            can_reserve := false;
+            RAISE EXCEPTION 'Schedule conflict found. The parent of your cubicule is reserved during your specified time. See debug info.';
+        END IF;
 
         -- For each reservation of the wanted local, check if their dates conflicts with the wanted one
         FOR reservation_record IN
@@ -116,9 +166,10 @@ $$
         IF (can_reserve) THEN
             SELECT COALESCE(MAX(reservation_id), 0) + 1 INTO new_id FROM public.reservation;
             NEW.reservation_id := new_id;
+            RAISE INFO '----------------------------- SUCCESS!';
             return NEW;
         ElSE
-            RAISE EXCEPTION 'Schedule conflict found! Reservation cancelled';
+            RAISE EXCEPTION 'Schedule conflict found! Reservation cancelled. Youre trying to reserve a local that is already reserved in the time you want!';
         END IF;
     END;
 $$ LANGUAGE plpgsql;
